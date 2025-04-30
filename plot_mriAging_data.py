@@ -93,7 +93,7 @@ for i, subject in enumerate(subjects):
         weighted_fat_fraction[i, j] = np.sum([data_dict[muscle]['Fat Fraction'][i, j] * data_dict[muscle]['Volume'][i, j] / total_volume for muscle in muscles])
 
 # Second timepoint
-timepoint_to_plot = 0
+timepoint_to_plot = 1
 velocity_to_plot = 0 #0, 1, 2, 3, 4 corresponds to 0, -60, -45, 90, 120
 remove_nans = True
 
