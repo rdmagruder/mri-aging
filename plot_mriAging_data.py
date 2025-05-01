@@ -121,14 +121,14 @@ torque4 = data_dict[muscles[0]]['Torque'][:,timepoint_to_plot,4]
 no_nans = ~(np.isnan(peak_kem_stand) | np.isnan(radial_diffusivity))
 radial_diffusivity = radial_diffusivity[no_nans]
 peak_kem_stand = -np.array(peak_kem_stand)[no_nans]
+peak_kem_sit = -np.array(peak_kem_sit)[no_nans]
+peak_hfm_stand = -np.array(peak_hfm_stand)[no_nans]
+peak_hfm_sit = -np.array(peak_hfm_sit)[no_nans]
 volume_total = volume_total[no_nans]
 contractile_volume = contractile_volume[no_nans]
 fat_fraction = fat_fraction[no_nans]
 age = age[no_nans]
 STS_time = STS_time[no_nans]
-peak_kem_sit = peak_kem_sit[no_nans]
-peak_hfm_stand = peak_hfm_stand[no_nans]
-peak_hfm_sit = peak_hfm_sit[no_nans]
 peak_force_stand = peak_force_stand[no_nans]
 peak_force_sit = peak_force_sit[no_nans]
 peak_torso_ang_vel = peak_torso_ang_vel[no_nans]
@@ -232,12 +232,121 @@ plot_correls(contractile_volume_standardized, 'Contractile Volume Standardized',
 plot_correls(fat_fraction, 'Fat Fraction', 'FF_vs_moments_timepoint{}.svg'.format(timepoint_to_plot), 'FF_vs_STSmetrics_timepoint{}.svg'.format(timepoint_to_plot))
 
 # Plot correls for Radial Diffusivity * Volume Total
-plot_correls(x, 'Radial Diffusivity * Volume Total', 'RDxVol_vs_moments_timepoint{}.svg'.format(timepoint_to_plot), 'RDxVolvs_STSmetrics_timepoint{}.svg'.format(timepoint_to_plot))
+plot_correls(x, 'Radial Diffusivity * Volume Total', 'RDxVol_vs_moments_timepoint{}.svg'.format(timepoint_to_plot), 'RDxVol_vs_STSmetrics_timepoint{}.svg'.format(timepoint_to_plot))
 
 # Plot correls for all torques
 for i, torque in enumerate(torques.T):
     plot_correls(torque, 'Torque {} deg/s'.format(velocities[i]), 'torque_{}deg_vs_moments_timepoint{}.svg'.format(velocities[i], timepoint_to_plot), 'torque_{}deg_vs_STSmetrics_timepoint{}.svg'.format(velocities[i], timepoint_to_plot))
 
+def plot_correls_1x4(y, ylabel, save_name):
+    # Make a subplot of 4 plots. All with input y on the y axis. the x axis will be kem_stand, sts_time, torso_orientation_liftoff, peak_torso_ang_vel
+    fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+    # Plot 1: y vs Peak KEM Stand
+    ax[0].scatter(peak_kem_stand, y)
+    ax[0].set_xlabel('Peak KEM Stand')
+    ax[0].set_ylabel(ylabel)
+    correlation1, p_value1 = pearsonr(peak_kem_stand, y)
+    ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+    # Plot 2: y vs STS Time
+    ax[1].scatter(STS_time, y)
+    ax[1].set_xlabel('STS Time')
+    ax[1].set_ylabel(ylabel)
+    correlation2, p_value2 = pearsonr(STS_time, y)
+    ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation2, p_value2), transform=ax[1].transAxes, ha='center')
+    # Plot 3: y vs Torso Orientation at Liftoff
+    ax[2].scatter(torso_orientation_liftoff, y)
+    ax[2].set_xlabel('Torso Orientation at Liftoff')
+    ax[2].set_ylabel(ylabel)
+    correlation3, p_value3 = pearsonr(torso_orientation_liftoff, y)
+    ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[2].transAxes, ha='center')
+    # Plot 4: y vs Peak Torso Ang Velocity
+    ax[3].scatter(peak_torso_ang_vel, y)
+    ax[3].set_xlabel('Peak Torso Ang Velocity')
+    ax[3].set_ylabel(ylabel)
+    correlation4, p_value4 = pearsonr(peak_torso_ang_vel, y)
+    ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[3].transAxes, ha='center')
+    # Save the figure as an svg file with the name save_name
+    plt.savefig(os.path.join(repo_dir, save_name), format='svg', dpi=300)
+    plt.show()
+
+# Plot correls for all torques
+for i, torque in enumerate(torques.T): #save to PaperFigures folder
+    plot_correls_1x4(torque, 'Torque {} deg/s'.format(velocities[i]), 'PaperFigures/torque_{}deg_timepoint{}.svg'.format(velocities[i], timepoint_to_plot))
+
+# plot correls for Radial Diffusivity * Volume Total
+plot_correls_1x4(x, 'Radial Diffusivity * Volume Total', 'PaperFigures/RDxVol_timepoint{}.svg'.format(timepoint_to_plot))
+# plot correls for Volume Total standardized
+plot_correls_1x4(volume_total_standardized, 'Volume Total Standardized', 'PaperFigures/Vol_Total_timepoint{}.svg'.format(timepoint_to_plot))
+# plot correls for Contractile Volume standardized
+plot_correls_1x4(contractile_volume_standardized, 'Contractile Volume Standardized', 'PaperFigures/CV_timepoint{}.svg'.format(timepoint_to_plot))
+# plot correls for Fat Fraction
+plot_correls_1x4(fat_fraction, 'Fat Fraction', 'PaperFigures/FF_timepoint{}.svg'.format(timepoint_to_plot))
+# plot correls for Radial Diffusivity standardized
+plot_correls_1x4(radial_diffusivity_standardized, 'Radial Diffusivity Standardized', 'PaperFigures/RD_timepoint{}.svg'.format(timepoint_to_plot))
+
+# 1x4 subplot. Plot KEM moment on x axis and Total volume standardized, fat fraction, radial diffusivity standardized, and RDxVol standardized on y axis
+fig, ax = plt.subplots(1, 5, figsize=(25, 5))
+# Plot 1: KEM moment vs Total volume standardized
+ax[0].scatter(peak_kem_stand, volume_total_standardized)
+ax[0].set_xlabel('Peak KEM Stand')
+ax[0].set_ylabel('Total Volume Standardized')
+correlation1, p_value1 = pearsonr(peak_kem_stand, volume_total_standardized)
+ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+# Plot 2: KEM moment vs Fat Fraction
+ax[1].scatter(peak_kem_stand, fat_fraction)
+ax[1].set_xlabel('Peak KEM Stand')
+ax[1].set_ylabel('Fat Fraction')
+correlation2, p_value2 = pearsonr(peak_kem_stand, fat_fraction)
+ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation2, p_value2), transform=ax[1].transAxes, ha='center')
+# Plot 3: KEM moment vs contractile volume standardized
+ax[2].scatter(peak_kem_stand, contractile_volume_standardized)
+ax[2].set_xlabel('Peak KEM Stand')
+ax[2].set_ylabel('Contractile Volume Standardized')
+correlation3, p_value3 = pearsonr(peak_kem_stand, contractile_volume_standardized)
+ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[2].transAxes, ha='center')
+# Plot 4: KEM moment vs Radial Diffusivity Standardized
+ax[3].scatter(peak_kem_stand, radial_diffusivity_standardized)
+ax[3].set_xlabel('Peak KEM Stand')
+ax[3].set_ylabel('Radial Diffusivity Standardized')
+correlation4, p_value4 = pearsonr(peak_kem_stand, radial_diffusivity_standardized)
+ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[3].transAxes, ha='center')
+# Plot 5: KEM moment vs Radial Diffusivity * Volume Total Standardized
+ax[4].scatter(peak_kem_stand, x)
+ax[4].set_xlabel('Peak KEM Stand')
+ax[4].set_ylabel('Radial Diffusivity * Volume Total Standardized')
+correlation5, p_value5 = pearsonr(peak_kem_stand, x)
+ax[4].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation5, p_value5), transform=ax[4].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'KEM_moments_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
+# 1x4 subplot. Plot KEM moment on x axis and Total volume standardized, fat fraction, radial diffusivity standardized, and RDxVol standardized on y axis
+fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+# Plot 1: KEM moment vs Total volume standardized
+ax[0].scatter(peak_kem_stand, volume_total_standardized)
+ax[0].set_xlabel('Peak KEM Stand')
+ax[0].set_ylabel('Total Volume Standardized')
+correlation1, p_value1 = pearsonr(peak_kem_stand, volume_total_standardized)
+ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+# Plot 3: KEM moment vs contractile volume standardized
+ax[1].scatter(peak_kem_stand, contractile_volume_standardized)
+ax[1].set_xlabel('Peak KEM Stand')
+ax[1].set_ylabel('Contractile Volume Standardized')
+correlation3, p_value3 = pearsonr(peak_kem_stand, contractile_volume_standardized)
+ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[1].transAxes, ha='center')
+# Plot 4: KEM moment vs Radial Diffusivity Standardized
+ax[2].scatter(peak_kem_stand, radial_diffusivity_standardized)
+ax[2].set_xlabel('Peak KEM Stand')
+ax[2].set_ylabel('Radial Diffusivity Standardized')
+correlation4, p_value4 = pearsonr(peak_kem_stand, radial_diffusivity_standardized)
+ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[2].transAxes, ha='center')
+# Plot 5: KEM moment vs Radial Diffusivity * Volume Total Standardized
+ax[3].scatter(peak_kem_stand, x)
+ax[3].set_xlabel('Peak KEM Stand')
+ax[3].set_ylabel('Radial Diffusivity * Volume Total Standardized')
+correlation5, p_value5 = pearsonr(peak_kem_stand, x)
+ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation5, p_value5), transform=ax[3].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'PaperFigures/KEM_moments_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
 
 
 # Make a 1x5 subplot with torque velocities on the y and peak_kem_stand on the x
