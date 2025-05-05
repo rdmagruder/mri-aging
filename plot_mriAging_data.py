@@ -348,6 +348,36 @@ ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation5, p_value5), tran
 plt.savefig(os.path.join(repo_dir, 'PaperFigures/KEM_moments_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
 plt.show()
 
+# Make a 1x4 subplot with torque0 on the x and total volume standardized, contractile volume standardized, radial diffusivity standardized, and RDxVol standardized on y axis
+fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+# Plot 1: Torque0 vs Total volume standardized
+ax[0].scatter(torque0, volume_total_standardized) #torque0 is 0 deg
+ax[0].set_xlabel('Torque at 0 deg/s')
+ax[0].set_ylabel('Total Volume Standardized')
+correlation1, p_value1 = pearsonr(torque0, volume_total_standardized)
+ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+# Plot 2: Torque0 vs Contractile Volume Standardized
+ax[1].scatter(torque0, contractile_volume_standardized)
+ax[1].set_xlabel('Torque at 0 deg/s')
+ax[1].set_ylabel('Contractile Volume Standardized')
+correlation2, p_value2 = pearsonr(torque0, contractile_volume_standardized)
+ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation2, p_value2), transform=ax[1].transAxes, ha='center')
+# Plot 3: Torque0 vs Radial Diffusivity Standardized
+ax[2].scatter(torque0, radial_diffusivity_standardized)
+ax[2].set_xlabel('Torque at 0 deg/s')
+ax[2].set_ylabel('Radial Diffusivity Standardized')
+correlation3, p_value3 = pearsonr(torque0, radial_diffusivity_standardized)
+ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[2].transAxes, ha='center')
+# Plot 4: Torque0 vs Radial Diffusivity * Volume Total Standardized
+ax[3].scatter(torque0, x)
+ax[3].set_xlabel('Torque at 0 deg/s')
+ax[3].set_ylabel('Radial Diffusivity * Volume Total Standardized')
+correlation4, p_value4 = pearsonr(torque0, x)
+ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[3].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'PaperFigures/torque0_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
+
 
 # Make a 1x5 subplot with torque velocities on the y and peak_kem_stand on the x
 fig, ax = plt.subplots(1, 5, figsize=(25, 5))
@@ -359,9 +389,24 @@ for i in range(5):
     ax[i].set_ylabel('Torque at {} deg/s'.format(velocities[i]))
     correlation1, p_value1 = pearsonr(peak_kem_stand, data_dict[muscles[0]]['Torque'][:,timepoint_to_plot,i][no_nans])
     ax[i].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[i].transAxes, ha='center')
-plt.show()
-# Save the figure as an svg file with the nam 'torque_velocities_vs_kem_stand.svg'
 plt.savefig(os.path.join(repo_dir, 'torque_velocities_vs_kem_stand_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
+# Make a 1x5 subplot with torque velocities on the y and x (radial diffusivity * volume total) on the x
+fig, ax = plt.subplots(1, 5, figsize=(25, 5))
+# Plot 1: Torque vs radial diffusivity * volume total
+for i, torque in enumerate(torques.T):
+    ax[i].scatter(x, torque)
+    ax[i].set_xlabel('Radial Diffusivity * Volume Total')
+    # Use velocities to label the y axis
+    ax[i].set_ylabel('Torque at {} deg/s'.format(velocities[i]))
+    correlation1, p_value1 = pearsonr(x, torque)
+    ax[i].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[i].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'PaperFigures/torque_velocities_vs_RDxVol_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
+
+
 
 
 # I want to statistically compare the strength of relationship between x and peak_kem_stand and x and STS_time
