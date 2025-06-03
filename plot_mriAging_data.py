@@ -348,6 +348,66 @@ ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation5, p_value5), tran
 plt.savefig(os.path.join(repo_dir, 'PaperFigures/KEM_moments_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
 plt.show()
 
+KEM_by_torque = peak_kem_stand / torque0
+# 1x4 subplot. Plot kem_by_torque on x axis and Total volume standardized, contractile volume standardized, radial diffusivity standardized, and RDxVol standardized on y axis
+fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+# Plot 1: KEM by Torque vs Total volume standardized
+ax[0].scatter(KEM_by_torque, volume_total_standardized)
+ax[0].set_xlabel('KEM by Isometric Torque')
+ax[0].set_ylabel('Total Volume Standardized')
+correlation1, p_value1 = pearsonr(KEM_by_torque, volume_total_standardized)
+ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+# Plot 2: KEM by Torque vs Contractile Volume Standardized
+ax[1].scatter(KEM_by_torque, contractile_volume_standardized)
+ax[1].set_xlabel('KEM by Isometric Torque')
+ax[1].set_ylabel('Contractile Volume Standardized')
+correlation2, p_value2 = pearsonr(KEM_by_torque, contractile_volume_standardized)
+ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation2, p_value2), transform=ax[1].transAxes, ha='center')
+# Plot 3: KEM by Torque vs Radial Diffusivity Standardized
+ax[2].scatter(KEM_by_torque, radial_diffusivity_standardized)
+ax[2].set_xlabel('KEM by Isometric Torque')
+ax[2].set_ylabel('Radial Diffusivity Standardized')
+correlation3, p_value3 = pearsonr(KEM_by_torque, radial_diffusivity_standardized)
+ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[2].transAxes, ha='center')
+# Plot 4: KEM by Torque vs Radial Diffusivity * Volume Total Standardized
+ax[3].scatter(KEM_by_torque, x)
+ax[3].set_xlabel('KEM by Isometric Torque')
+ax[3].set_ylabel('Radial Diffusivity * Volume Total Standardized')
+correlation4, p_value4 = pearsonr(KEM_by_torque, x)
+ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[3].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'KEM_by_torque0_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
+KEM_by_torque = peak_kem_stand / torque4
+# 1x4 subplot. Plot kem_by_torque on x axis and Total volume standardized, contractile volume standardized, radial diffusivity standardized, and RDxVol standardized on y axis
+fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+# Plot 1: KEM by Torque vs Total volume standardized
+ax[0].scatter(KEM_by_torque, volume_total_standardized)
+ax[0].set_xlabel('KEM by Torque 120 deg/s')
+ax[0].set_ylabel('Total Volume Standardized')
+correlation1, p_value1 = pearsonr(KEM_by_torque, volume_total_standardized)
+ax[0].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation1, p_value1), transform=ax[0].transAxes, ha='center')
+# Plot 2: KEM by Torque vs Contractile Volume Standardized
+ax[1].scatter(KEM_by_torque, contractile_volume_standardized)
+ax[1].set_xlabel('KEM by Torque 120 deg/s')
+ax[1].set_ylabel('Contractile Volume Standardized')
+correlation2, p_value2 = pearsonr(KEM_by_torque, contractile_volume_standardized)
+ax[1].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation2, p_value2), transform=ax[1].transAxes, ha='center')
+# Plot 3: KEM by Torque vs Radial Diffusivity Standardized
+ax[2].scatter(KEM_by_torque, radial_diffusivity_standardized)
+ax[2].set_xlabel('KEM by Torque 120 deg/s')
+ax[2].set_ylabel('Radial Diffusivity Standardized')
+correlation3, p_value3 = pearsonr(KEM_by_torque, radial_diffusivity_standardized)
+ax[2].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation3, p_value3), transform=ax[2].transAxes, ha='center')
+# Plot 4: KEM by Torque vs Radial Diffusivity * Volume Total Standardized
+ax[3].scatter(KEM_by_torque, x)
+ax[3].set_xlabel('KEM by Torque 120 deg/s')
+ax[3].set_ylabel('Radial Diffusivity * Volume Total Standardized')
+correlation4, p_value4 = pearsonr(KEM_by_torque, x)
+ax[3].text(0.5, 0.9, 'r= {:.2f}, p= {:.2e}'.format(correlation4, p_value4), transform=ax[3].transAxes, ha='center')
+plt.savefig(os.path.join(repo_dir, 'KEM_by_torque120_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)), format='svg', dpi=300)
+plt.show()
+
 for i, torque in enumerate(torques.T):
     # Make a 1x4 subplot with torque0 on the x and total volume standardized, contractile volume standardized, radial diffusivity standardized, and RDxVol standardized on y axis
     fig, ax = plt.subplots(1, 4, figsize=(20, 5))
