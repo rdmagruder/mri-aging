@@ -1,0 +1,14 @@
+name: mri-aging
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - seaborn
+  - matplotlib
+  - scikit-learn
+  - scipy
+  - statsmodels
+  - spyder
