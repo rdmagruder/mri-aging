@@ -7,6 +7,7 @@ import re
 import seaborn as sns
 import statsmodels.api as sm
 from sklearn.preprocessing import StandardScaler
+from sklearn.cross_decomposition import PLSCanonical
 
 plt.rcParams.update({
     'font.family': 'Arial',
@@ -511,92 +512,6 @@ plt.savefig(os.path.join(repo_dir, f'finalFigures/correlation_barplot_torque_gro
 plt.show()
 
 
-# Setup
-mri_metrics = ['Volume Total', 'Radial Diffusivity', 'Volume + RD']
-metrics = ['KEM', 'Torso Ang Vel', 'Torso Ang', 'STS Time']
-colors = ['#c85250', '#5292c6', '#e49b3a', '#59b87f']  # One color per metric
-
-# Correlation and p-values grouped by MRI metric
-correlations_by_mri = [
-    [correlation_KEM_volume, correlation_ang_vel_volume, correlation_orientation_volume, correlation_STS_volume],
-    [correlation_KEM_rd, correlation_ang_vel_rd, correlation_orientation_rd, correlation_STS_rd],
-    [correlation_KEM_x, correlation_ang_vel_x, correlation_orientation_x, correlation_STS_x],
-]
-
-p_values_by_mri = [
-    [p_value_KEM_volume, p_value_ang_vel_volume, p_value_orientation_volume, p_value_STS_volume],
-    [p_value_KEM_rd, p_value_ang_vel_rd, p_value_orientation_rd, p_value_STS_rd],
-    [p_value_KEM_x, p_value_ang_vel_x, p_value_orientation_x, p_value_STS_x],
-]
-
-# Plot setup
-width = 0.2
-loc = np.arange(len(mri_metrics))  # Volume, RD, Volume+RD
-
-fig, ax = plt.subplots(figsize=(5.2, 3))
-bars = []
-
-# Plot 4 bars per group (one for each metric) across MRI types
-for i in range(4):  # 4 metrics
-    bar = ax.bar(loc + (i - 1.5) * width, [corr[i] for corr in correlations_by_mri],
-                 width, label=metrics[i], color=colors[i])
-    bars.append(bar)
-
-# Add significance stars per bar
-for i in range(4):
-    add_significance_bars(bars[i], [p[i] for p in p_values_by_mri])
-
-# Final touches
-ax.set_ylabel('Correlation Coefficient')
-ax.set_xticks(loc)
-ax.set_xticklabels(mri_metrics)
-ax.set_ylim(None, 1)  # y-axis starts at bottom of lowest bar
-ax.axhline(0, color='black', linewidth=1)  # ensure x-axis is shown at y=0
-ax.tick_params(axis='x', length=0)  # hide x tick marks but keep labelsax.axhline(0, color='black', linewidth=1)
-ax.tick_params(axis='x', length=0)
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), frameon=False, ncol=2)
-
-sns.despine(ax=ax, top=True, right=True, bottom=True)
-plt.tight_layout()
-
-# Save
-plt.savefig(os.path.join(repo_dir, f'finalFigures/correlation_barplot_grouped_by_mri_timepoint{timepoint_to_plot}.svg'),
-            format='svg', dpi=300, bbox_inches='tight')
-plt.show()
-
-
-
-colors = '#28aeed'
-isokin_by_isomet = torque4/torque0
-KEM_by_isomet = peak_kem_stand/torque0
-# make a 2x3 subplot. y axis will be standardized volume, radial diffusivity, and x (combined radial diffusivity and volume). row 1 will be isokin_by_isomet, row 2 will be KEM_by_isomet
-
-fig, ax = plt.subplots(2, 2, figsize=(3.6, 4))
-plots = [
-    (ax[0, 0], isokin_by_isomet, volume_total_standardized, 'Volume Total (Standardized)', 'Isokinetic / Isometric Torque'),
-    (ax[0, 1], isokin_by_isomet, radial_diffusivity_standardized, 'Radial Diffusivity (Standardized)', 'Isokinetic / Isometric Torque'),
-    (ax[1, 0], KEM_by_isomet, volume_total_standardized, 'Volume Total (Standardized)', 'KEM / Isometric Torque'),
-    (ax[1, 1], KEM_by_isomet, radial_diffusivity_standardized, 'Radial Diffusivity (Standardized)', 'KEM / Isometric Torque')
-]
-
-for i, (axis, x_value, y, ylabel, xlabel) in enumerate(plots):
-    correlation, p_value = pearsonr(x_value, y)
-    axis.set_xlabel(xlabel)
-    axis.set_ylabel(ylabel)
-    p_str = f"p={p_value:.3f}".replace("p=0", "p=") if p_value >= 0.001 else "p<.001"
-    axis.text(0.5, 1, f'r={correlation:.2f}, {p_str}', transform=axis.transAxes, ha='center')
-
-    if p_value < 0.05:
-        sns.regplot(x=x_value, y=y, ax=axis, scatter=True, color=colors, ci=95, line_kws={'color': 'black'}, scatter_kws={'s': 20})
-    else:
-        axis.scatter(x_value, y, c=colors, s=20)
-plt.tight_layout()
-for axis in ax.flat:
-    sns.despine(ax=axis, trim=False)
-# Save the figure as an svg file with the name save_name
-plt.savefig(os.path.join(repo_dir, 'finalFigures/ratios_vs_MRI_timepoint{}.svg'.format(timepoint_to_plot)),
-            format='svg', dpi=300, bbox_inches='tight')
-plt.show()
 
 colors = ['#28aeed' if sex == 'M' else '#FFD100' for sex in sex_vector]
 
@@ -665,104 +580,6 @@ for outcome, label in zip(outcomes, outcome_labels):
 
 results_df = pd.DataFrame(results)
 print(results_df.to_string(index=False))
-results_df.to_excel(os.path.join(repo_dir, 'finalFigures/regression_results_timepoint{}_BwH_Norm.xlsx'.format(timepoint_to_plot)),
-                     index=False)
+# results_df.to_excel(os.path.join(repo_dir, 'finalFigures/regression_results_timepoint{}_BwH_Norm.xlsx'.format(timepoint_to_plot)),
+#                      index=False)
 
-
-from sklearn.linear_model import LinearRegression
-# targets = ['volume', 'radial_diffusivity', 'composite_x']
-# target_labels = ['Volume', 'Radial Diffusivity', 'Composite']
-#
-# predictors = ['isometric', 'isokinetic', 'kem']
-# predictor_labels = ['Isometric Torque (%BwH)', '120 deg/s Isokinetic Torque (%BwH)', 'Peak KEM Stand (%BwH)']
-#
-# results = []
-#
-# for predictor, pred_label in zip(predictors, predictor_labels):
-#     for target, target_label in zip(targets, target_labels):
-#         # Raw correlation
-#         raw_r, raw_p = pearsonr(df[predictor], df[target])
-#
-#         # Adjusted (partial) correlation: remove age and sex effects
-#         covariates = df[['age', 'sex']]
-#
-#         # Regress out covariates from both predictor and target
-#         pred_resid = df[predictor] - LinearRegression().fit(covariates, df[predictor]).predict(covariates)
-#         target_resid = df[target] - LinearRegression().fit(covariates, df[target]).predict(covariates)
-#
-#         # Correlate residuals (partial correlation)
-#         adj_r, adj_p = pearsonr(pred_resid, target_resid)
-#
-#         results.append({
-#             'Predictor': pred_label,
-#             'Outcome': target_label,
-#             'Raw r': f"{raw_r:.3f}",
-#             'Raw p': f"{raw_p:.3f}",
-#             'Adjusted r (age+sex)': f"{adj_r:.3f}",
-#             'Adjusted p (age+sex)': f"{adj_p:.3f}"
-#         })
-#
-# results_df = pd.DataFrame(results)
-# print(results_df.to_string(index=False))
-#
-# # Save
-# results_df.to_excel(os.path.join(repo_dir, f'finalFigures/correlation_results_partial_age_sex_timepoint{timepoint_to_plot}.xlsx'), index=False)
-#
-#
-# predictors = {
-#     'Knee Extension\nMoment (Nm)': peak_kem_stand,
-#     'Isometric\nTorque (Nm)': torque0,
-#     '120 deg/s Isokinetic\nTorque (Nm)': torque4
-# }
-# outcomes = {
-#     'Volume Total': volume_total_standardized,
-#     'Radial Diffusivity': radial_diffusivity_standardized,
-#     'Radial Diffusivity + Volume Total': x
-# }
-# covariates = np.column_stack((age, [1 if s == 'F' else 0 for s in sex_vector]))
-#
-# # Compute adjusted r (partial correlations)
-# adj_r_matrix = []
-# p_matrix = []
-#
-# for pred_vals in predictors.values():
-#     row_adj_r = []
-#     row_p = []
-#     for out_vals in outcomes.values():
-#         pred_resid = pred_vals - LinearRegression().fit(covariates, pred_vals).predict(covariates)
-#         out_resid = out_vals - LinearRegression().fit(covariates, out_vals).predict(covariates)
-#         r_adj, p_adj = pearsonr(pred_resid, out_resid)
-#         row_adj_r.append(r_adj)
-#         row_p.append(p_adj)
-#     adj_r_matrix.append(row_adj_r)
-#     p_matrix.append(row_p)
-#
-# # Plot
-# loc = np.arange(len(predictors)) * 0.9
-# width = 0.25
-# fig, ax = plt.subplots(figsize=(4, 3))
-# bars1 = ax.bar(loc - width, [row[0] for row in adj_r_matrix], width, label='Volume Total', color='#FFD100')
-# bars2 = ax.bar(loc, [row[1] for row in adj_r_matrix], width, label='Radial Diffusivity', color='#43d1ad')
-# bars3 = ax.bar(loc + width, [row[2] for row in adj_r_matrix], width, label='RD + Volume', color='#b4656f')
-#
-# ax.set_ylabel('Adjusted Correlation Coefficient')
-# ax.set_xticks(loc)
-# ax.set_xticklabels(predictors.keys())
-# ax.set_ylim(-.25, 1)
-# ax.axhline(0, color='black', linewidth=1)
-# ax.tick_params(axis='x', length=0)
-#
-# def add_stars(bars, p_vals):
-#     for bar, p in zip(bars, p_vals):
-#         if p < 0.05:
-#             height = bar.get_height()
-#             ax.annotate('*', (bar.get_x() + bar.get_width()/2, height), ha='center', va='bottom', fontsize=16)
-#
-# add_stars(bars1, [row[0] for row in p_matrix])
-# add_stars(bars2, [row[1] for row in p_matrix])
-# add_stars(bars3, [row[2] for row in p_matrix])
-#
-# ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), frameon=False)
-# plt.tight_layout()
-# sns.despine(ax=ax, top=True, right=True, bottom=True)
-# plt.show()
