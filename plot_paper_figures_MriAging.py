@@ -8,6 +8,8 @@ import seaborn as sns
 import statsmodels.api as sm
 from sklearn.preprocessing import StandardScaler
 from sklearn.cross_decomposition import PLSCanonical
+from sklearn.linear_model import LinearRegression
+from statsmodels.stats.multitest import multipletests
 
 plt.rcParams.update({
     'font.family': 'Arial',
@@ -116,8 +118,8 @@ for muscle in muscles:
 
             # Sum the volumes for each muscle
             if muscle == muscles[-1]:
-                data_dict['Volume total'][i, j] = np.sum(data_dict[muscle]['Volume'][i, j] for muscle in muscles)
-                data_dict['contractile_volume'][i, j] = np.sum(
+                data_dict['Volume total'][i, j] = sum(data_dict[muscle]['Volume'][i, j] for muscle in muscles)
+                data_dict['contractile_volume'][i, j] = sum(
                     [data_dict[muscle]['Volume'][i, j] * (1 - data_dict[muscle]['Fat Fraction'][i, j] / 100) for muscle
                      in muscles])
 
@@ -254,8 +256,8 @@ df = pd.DataFrame({
 fig, ax = plt.subplots(1, 3, figsize=(7.2, 3))
 
 # Plot 1: volume_total vs peak_kem_stand
-sns.regplot(x=peak_kem_stand, y=volume_total_standardized, ax=ax[0], color='#28aeed', scatter_kws={'s': 20},
-            line_kws={'color': 'black', 'linewidth': 2}, ci=95)
+sns.regplot(x=peak_kem_stand, y=volume_total_standardized, ax=ax[0], color='#28aeed', scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
 ax[0].set_xlabel('Knee Extension Moment (Nm)')
 ax[0].set_ylabel('Volume Total (Standardized)')
 correlation1, p_value1 = pearsonr(peak_kem_stand, volume_total_standardized)
@@ -263,8 +265,8 @@ p_str = f"p={p_value1:.3f}".replace("p=0", "p=") if p_value1 >= 0.001 else "p<.0
 ax[0].text(0.5, 1, f'r={correlation1:.2f}, {p_str}', transform=ax[0].transAxes, ha='center')
 
 # Plot 2: radial diffusivity vs peak_kem_stand
-sns.regplot(x=peak_kem_stand, y=radial_diffusivity_standardized, ax=ax[1], color='#28aeed', scatter_kws={'s': 20},
-            line_kws={'color': 'black', 'linewidth': 2}, ci=95)
+sns.regplot(x=peak_kem_stand, y=radial_diffusivity_standardized, ax=ax[1], color='#28aeed', scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
 ax[1].set_xlabel('Knee Extension Moment (Nm)')
 ax[1].set_ylabel('Radial Diffusivity (Standardized)')
 correlation2, p_value2 = pearsonr(peak_kem_stand, radial_diffusivity_standardized)
@@ -272,8 +274,8 @@ correlation2, p_value2 = pearsonr(peak_kem_stand, radial_diffusivity_standardize
 p_str = f"p={p_value2:.3f}".replace("p=0", "p=") if p_value2 >= 0.001 else "p<.001"
 ax[1].text(0.5, 1, f'r={correlation2:.2f}, {p_str}', transform=ax[1].transAxes, ha='center')
 # Plot 3: x vs peak_kem_stand
-sns.regplot(x=peak_kem_stand, y=x, ax=ax[2], color='#28aeed', scatter_kws={'s': 20},
-            line_kws={'color': 'black', 'linewidth': 2}, ci=95)
+sns.regplot(x=peak_kem_stand, y=x, ax=ax[2], color='#28aeed', scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
 ax[2].set_xlabel('Knee Extension Moment (Nm)')
 ax[2].set_ylabel('Radial Diffusivity + Volume Total (Standardized)')
 correlation3, p_value3 = pearsonr(peak_kem_stand, x)
@@ -287,6 +289,128 @@ fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
 # Save the figure
 plt.savefig(os.path.join(repo_dir, f'finalFigures/KEM_vs_MRI_timepoint{timepoint_to_plot}_regression.svg'),
             format='svg', dpi=300, bbox_inches='tight')
+plt.show()
+
+n = len(df)
+peak_kem_stand_pred_volume = np.zeros(n)
+peak_kem_stand_pred_rd  = np.zeros(n)
+peak_kem_stand_pred_x   = np.zeros(n)
+
+for i in range(n):
+    train = df.drop(i)
+    test  = df.iloc[[i]]
+
+    # Volume
+    m = LinearRegression().fit(train[['KEM']], train['Volume'])
+    peak_kem_stand_pred_volume[i] = m.predict(test[['KEM']])[0]
+
+    # RD
+    m = LinearRegression().fit(train[['KEM']], train['RD'])
+    peak_kem_stand_pred_rd[i] = m.predict(test[['KEM']])[0]
+
+    # Composite
+    m = LinearRegression().fit(train[['KEM']], train['Composite'])
+    peak_kem_stand_pred_x[i] = m.predict(test[['KEM']])[0]
+
+# redo the regression plots with the predicted values from LOSO
+fig, ax = plt.subplots(1, 3, figsize=(7.2, 3))
+# Plot 1: volume_total vs peak_kem_stand
+sns.regplot(x=volume_total_standardized, y=peak_kem_stand_pred_volume, ax=ax[0], color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[0].set_xlabel('Volume Total (Standardized)')
+ax[0].set_ylabel('Predicted Volume from KEM (Standardized)')
+correlation1, p_value1 = pearsonr(volume_total_standardized, peak_kem_stand_pred_volume)
+p_str = f"p={p_value1:.3f}".replace("p=0", "p=") if p_value1 >= 0.001 else "p<.001"
+ax[0].text(0.5, 1, f'r={correlation1:.2f}, {p_str}', transform=ax[0].transAxes, ha='center')
+# Plot 2: radial diffusivity vs peak_kem_stand
+sns.regplot(x=radial_diffusivity_standardized, y=peak_kem_stand_pred_rd, ax=ax[1], color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[1].set_xlabel('Radial Diffusivity (Standardized)')
+ax[1].set_ylabel('Predicted RD from KEM (Standardized)')
+correlation2, p_value2 = pearsonr(radial_diffusivity_standardized, peak_kem_stand_pred_rd)
+p_str = f"p={p_value2:.3f}".replace("p=0", "p=") if p_value2 >= 0.001 else "p<.001"
+ax[1].text(0.5, 1, f'r={correlation2:.2f}, {p_str}', transform=ax[1].transAxes, ha='center')
+# Plot 3: x vs peak_kem_stand
+sns.regplot(x=x, y=peak_kem_stand_pred_x, ax=ax[2], color='#28aeed', scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[2].set_xlabel('Radial Diffusivity + Volume Total (Standardized)')
+ax[2].set_ylabel('Predicted Composite from KEM (Standardized)')
+correlation3, p_value3 = pearsonr(x, peak_kem_stand_pred_x)
+p_str = f"p={p_value3:.3f}".replace("p=0", "p=") if p_value3 >= 0.001 else "p<.001"
+ax[2].text(0.5, 1, f'r={correlation3:.2f}, {p_str}', transform=ax[2].transAxes, ha='center')
+# Despine all subplots (top and right only)
+for axis in ax:
+    sns.despine(ax=axis, top=True, right=True)
+fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
+# Save the figure
+plt.savefig(os.path.join(repo_dir,
+            f'finalFigures/KEM_vs_MRI_timepoint{timepoint_to_plot}_regression_LOSO.svg'),
+            format='svg', dpi=300, bbox_inches='tight')
+plt.show()
+
+velocities = [0, -60, -45, 90, 120]
+speed_labels = [-60, -45, 0, 90, 120]
+index_order = [velocities.index(v) for v in speed_labels]  # [1, 2, 0, 3, 4]
+
+# Stack and reorder torques
+torques = np.column_stack((torque0, torque1, torque2, torque3, torque4))
+torques_ordered = torques[:, index_order]
+
+# --- Plot: 5 rows (speeds) × 3 cols (Volume, RD, Composite) ---
+fig, axes = plt.subplots(5, 3, figsize=(7.2, 10.5), sharex=False)
+
+col_defs = [
+    ("Volume (Standardized)", volume_total_standardized),
+    ("Radial Diffusivity (Standardized)", radial_diffusivity_standardized),
+    ("Volume + RD (Standardized)", x),
+]
+
+# Column titles
+for j, (title, _) in enumerate(col_defs):
+    axes[0, j].set_title(title, fontsize=10)
+
+for i, spd in enumerate(speed_labels):
+    x_vals = torques_ordered[:, i]  # torque at this speed
+
+    for j, (_, y_vals) in enumerate(col_defs):
+        ax = axes[i, j]
+
+        sns.regplot(
+            x=x_vals, y=y_vals, ax=ax,
+            color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1},
+            ci=95
+        )
+
+        # r and p
+        r, p = pearsonr(x_vals, y_vals)
+        p_str = f"p={p:.3f}" if p >= 0.001 else "p<.001"
+        ax.text(0.5, 1.02, f"r={r:.2f}, {p_str}", transform=ax.transAxes,
+                ha='center', va='bottom', fontsize=9)
+
+        # Ax labels: x only on bottom row for cleanliness
+        if i == len(speed_labels) - 1:
+            ax.set_xlabel("Torque (Nm)")
+        else:
+            ax.set_xlabel("")
+
+        # Optional row label on the leftmost subplot
+        if j == 0:
+            ax.annotate(f"{spd}°/s", xy=(0, 0.5),
+                        xycoords=("axes fraction", "axes fraction"),
+                        xytext=(-0.32, 0), textcoords="axes fraction",
+                        ha="left", va="center", fontsize=9, rotation=90)
+
+        ax.set_ylabel("")
+        sns.despine(ax=ax, top=True, right=True)
+plt.tight_layout()
+fig.subplots_adjust(hspace=0.6, wspace=0.35)
+
+out_path = os.path.join(repo_dir, f'finalFigures/TorqueSpeeds_vs_MRI_timepoint{timepoint_to_plot}_regression_grid.svg')
+plt.savefig(out_path, format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
 
@@ -369,28 +493,137 @@ correlation_ang_vel_volume, p_value_ang_vel_volume = pearsonr(peak_torso_ang_vel
 correlation_ang_vel_rd, p_value_ang_vel_rd = pearsonr(peak_torso_ang_vel, radial_diffusivity_standardized)
 correlation_ang_vel_x, p_value_ang_vel_x = pearsonr(peak_torso_ang_vel, x)
 
-# make a bar plot of the correlations. the groups are Peak KEM Stand, Isometric Torque, and Isokinetic Torque (120 deg/s). each group has three bars: Volume Total, Radial Diffusivity, and Radial Diffusivity + Volume Total
-# Define the data
-groups = ['Knee Extension\nMoment (Nm)', 'Isometric\nTorque (Nm)', '120 deg/s Isokinetic\nTorque (Nm)']
-correlations = [
-    [correlation_KEM_volume, correlation_KEM_rd, correlation_KEM_x],
-    [correlation_torque0_volume, correlation_torque0_rd, correlation_torque0_x],
-    [correlation_torque4_volume, correlation_torque4_rd, correlation_torque4_x]
+
+# FDR CORRECTIONS:
+from statsmodels.stats.multitest import multipletests
+
+# -------------------------
+# PRIMARY HYPOTHESES (3x): KEM vs MRI metrics (Volume, RD, Composite)
+# -------------------------
+primary_names = [
+    "KEM ~ Volume",
+    "KEM ~ RD",
+    "KEM ~ Composite"
 ]
-# Create the bar plot
-loc = np.arange(len(groups))*.9  # the label locations
-width = 0.25  # the width of the bars
-fig, ax = plt.subplots(figsize=(4, 3))
-bars1 = ax.bar(loc - width, [corr[0] for corr in correlations], width, label='Volume Total', color='#FFD100')
-bars2 = ax.bar(loc, [corr[1] for corr in correlations], width, label='Radial Diffusivity', color='#43d1ad')
-bars3 = ax.bar(loc + width, [corr[2] for corr in correlations], width, label='Radial Diffusivity + Volume Total', color='#b4656f')
-# Add some text for labels, title and custom x-axis tick labels, etc.
-ax.set_ylabel('Correlation Coefficient')
-ax.set_xticks(loc)
-ax.set_xticklabels(groups)
-ax.set_ylim(0, 1)  # y-axis starts at bottom of lowest bar
-ax.axhline(0, color='black', linewidth=1)  # ensure x-axis is shown at y=0
-ax.tick_params(axis='x', length=0)  # hide x tick marks but keep labels
+primary_r = np.array([
+    correlation_KEM_volume,
+    correlation_KEM_rd,
+    correlation_KEM_x
+])
+primary_p = np.array([
+    p_value_KEM_volume,
+    p_value_KEM_rd,
+    p_value_KEM_x
+])
+
+_, primary_p_fdr, _, _ = multipletests(primary_p, alpha=0.05, method='fdr_bh')
+
+print("\nFDR-corrected PRIMARY hypotheses (KEM vs MRI metrics):")
+for name, r_val, p_raw, p_adj in zip(primary_names, primary_r, primary_p, primary_p_fdr):
+    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.2e}, p_FDR = {p_adj:.2e}")
+
+# -------------------------
+# SECONDARY HYPOTHESES (15x):
+# STS, torso angle, torso velocity, isometric, isokinetic vs
+# Volume, RD, Composite
+# -------------------------
+secondary_names = [
+    # STS
+    "STS ~ Volume",
+    "STS ~ RD",
+    "STS ~ Composite",
+    # Torso orientation
+    "TorsoAngle ~ Volume",
+    "TorsoAngle ~ RD",
+    "TorsoAngle ~ Composite",
+    # Torso angular velocity
+    "TorsoAngVel ~ Volume",
+    "TorsoAngVel ~ RD",
+    "TorsoAngVel ~ Composite",
+    # Isokinetic torque (torque4)
+    "Isokinetic120 ~ Volume",
+    "Isokinetic120 ~ RD",
+    "Isokinetic120 ~ Composite",
+    # Isometric torque (torque0)
+    "Isometric ~ Volume",
+    "Isometric ~ RD",
+    "Isometric ~ Composite",
+]
+
+secondary_r = np.array([
+    # STS
+    correlation_STS_volume,
+    correlation_STS_rd,
+    correlation_STS_x,
+    # Torso orientation
+    correlation_orientation_volume,
+    correlation_orientation_rd,
+    correlation_orientation_x,
+    # Torso angular velocity
+    correlation_ang_vel_volume,
+    correlation_ang_vel_rd,
+    correlation_ang_vel_x,
+    # Isokinetic torque (120 deg/s)
+    correlation_torque4_volume,
+    correlation_torque4_rd,
+    correlation_torque4_x,
+    # Isometric torque
+    correlation_torque0_volume,
+    correlation_torque0_rd,
+    correlation_torque0_x,
+])
+
+secondary_p = np.array([
+    # STS
+    p_value_STS_volume,
+    p_value_STS_rd,
+    p_value_STS_x,
+    # Torso orientation
+    p_value_orientation_volume,
+    p_value_orientation_rd,
+    p_value_orientation_x,
+    # Torso angular velocity
+    p_value_ang_vel_volume,
+    p_value_ang_vel_rd,
+    p_value_ang_vel_x,
+    # Isokinetic torque (120 deg/s)
+    p_value_torque4_volume,
+    p_value_torque4_rd,
+    p_value_torque4_x,
+    # Isometric torque
+    p_value_torque0_volume,
+    p_value_torque0_rd,
+    p_value_torque0_x,
+])
+
+_, secondary_p_fdr, _, _ = multipletests(secondary_p, alpha=0.05, method='fdr_bh')
+
+print("\nFDR-corrected SECONDARY hypotheses (other metrics vs MRI):")
+for name, r_val, p_raw, p_adj in zip(secondary_names, secondary_r, secondary_p, secondary_p_fdr):
+    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.2e}, p_FDR = {p_adj:.2e}")
+
+
+
+
+# ===== Unpack adjusted p-values for convenience =====
+
+# Primary (KEM vs Volume, RD, Composite)
+p_KEM_volume_adj, p_KEM_rd_adj, p_KEM_x_adj = primary_p_fdr
+
+# Secondary indices:
+# STS:         0–2
+# TorsoAngle:  3–5
+# TorsoAngVel: 6–8
+# Isokinetic:  9–11
+# Isometric:   12–14
+p_STS_volume_adj, p_STS_rd_adj, p_STS_x_adj = secondary_p_fdr[0:3]
+p_orientation_volume_adj, p_orientation_rd_adj, p_orientation_x_adj = secondary_p_fdr[3:6]
+p_ang_vel_volume_adj, p_ang_vel_rd_adj, p_ang_vel_x_adj = secondary_p_fdr[6:9]
+p_torque4_volume_adj, p_torque4_rd_adj, p_torque4_x_adj = secondary_p_fdr[9:12]   # Isokinetic 120
+p_torque0_volume_adj, p_torque0_rd_adj, p_torque0_x_adj = secondary_p_fdr[12:15]  # Isometric
+
+
+
 # Add a * to the top of the bars if the p-value is less than 0.05
 def add_significance_bars(bars, p_values):
     for bar, p_value in zip(bars, p_values):
@@ -403,18 +636,7 @@ def add_significance_bars(bars, p_values):
                         ha='center', va='bottom',
                         fontsize=16, color='black',)
 
-add_significance_bars(bars1, [p_value_KEM_volume, p_value_torque0_volume, p_value_torque4_volume])
-add_significance_bars(bars2, [p_value_KEM_rd, p_value_torque0_rd, p_value_torque4_rd])
-add_significance_bars(bars3, [p_value_KEM_x, p_value_torque0_x, p_value_torque4_x])
 
-# move the legend outside the plot
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), frameon=False)
-# Adjust layout
-plt.tight_layout()
-sns.despine(ax=ax, top=True, right=True)# Save the figure
-plt.savefig(os.path.join(repo_dir, 'finalFigures/correlation_barplot_torque_timepoint{}.svg'.format(timepoint_to_plot)),
-            format='svg', dpi=300, bbox_inches='tight')
-plt.show()
 
 # make a bar plot with groups KEM, isomet, isokin, STS, orientation, ang_vel with three bars for each group: volume_total, radial_diffusivity, and x (radial diffusivity + volume total)
 # Define the data for the bar plot
@@ -441,12 +663,22 @@ ax.set_ylim(None, 1)  # y-axis starts at bottom of lowest bar
 ax.axhline(0, color='black', linewidth=1)  # ensure x-axis is shown at y=0
 ax.tick_params(axis='x', length=0)  # hide x tick marks but keep labels
 # Add a * to the top of the bars if the p-value is less than 0.05
-add_significance_bars(bars1, [p_value_KEM_volume,
-                                p_value_STS_volume, p_value_orientation_volume, p_value_ang_vel_volume])
-add_significance_bars(bars2, [p_value_KEM_rd,
-                                p_value_STS_rd, p_value_orientation_rd, p_value_ang_vel_rd])
-add_significance_bars(bars3, [p_value_KEM_x,
-                                p_value_STS_x, p_value_orientation_x, p_value_ang_vel_x])
+add_significance_bars(
+    bars1,
+    [p_KEM_volume_adj,
+     p_STS_volume_adj, p_orientation_volume_adj, p_ang_vel_volume_adj]
+)
+add_significance_bars(
+    bars2,
+    [p_KEM_rd_adj,
+     p_STS_rd_adj, p_orientation_rd_adj, p_ang_vel_rd_adj]
+)
+add_significance_bars(
+    bars3,
+    [p_KEM_x_adj,
+     p_STS_x_adj, p_orientation_x_adj, p_ang_vel_x_adj]
+)
+
 # move the legend outside the plot
 ax.set_ylim(None, 1)  # Set y-axis limits for better visibility
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), frameon=False)
@@ -471,11 +703,15 @@ correlations_by_mri = [
 ]
 
 # Corresponding p-values
-p_values_by_mri = [
-    [p_value_KEM_volume, p_value_torque4_volume, p_value_torque0_volume],
-    [p_value_KEM_rd, p_value_torque4_rd, p_value_torque0_rd],
-    [p_value_KEM_x, p_value_torque4_x, p_value_torque0_x],
+p_values_by_mri_adj = [
+    # Volume row: KEM, isokin, isomet
+    [p_KEM_volume_adj, p_torque4_volume_adj, p_torque0_volume_adj],
+    # RD row
+    [p_KEM_rd_adj, p_torque4_rd_adj, p_torque0_rd_adj],
+    # Composite row
+    [p_KEM_x_adj, p_torque4_x_adj, p_torque0_x_adj],
 ]
+
 
 # Plot setup
 width = 0.2
@@ -491,8 +727,9 @@ for i in range(len(mri_groups)):
     )
 
 # Add significance stars
-for bar_group, p_values in zip(bars, p_values_by_mri):
+for bar_group, p_values in zip(bars, p_values_by_mri_adj):
     add_significance_bars(bar_group, p_values)
+
 
 # Labels and style
 ax.set_ylabel('Correlation Coefficient with MRI Metrics')
@@ -515,71 +752,4 @@ plt.show()
 
 colors = ['#28aeed' if sex == 'M' else '#FFD100' for sex in sex_vector]
 
-
-df = pd.DataFrame({
-    'age': age,
-    'sex': [1 if s == 'F' else 0 for s in sex_vector],  # F=1, M=0
-    'volume': volume_total_standardized,
-    'radial_diffusivity': radial_diffusivity_standardized,
-    'composite_x': x,
-    'isometric_BwH': torque0 / weight_height * 100,  # Convert to percentage of weight-height
-    'isokinetic_BwH': torque4 / weight_height * 100,  # Convert to percentage of weight-height
-    'kem_BwH': peak_kem_stand / weight_height * 100, # Convert to percentage of weight-height
-    'isometric': torque0,
-    'isokinetic': torque4,
-    'kem': peak_kem_stand,
-})
-
-# scaling outcomes
-df['age_std'] = (df['age'] - df['age'].mean()) / df['age'].std(ddof=0)
-df['isometric_std'] = (df['isometric'] - df['isometric'].mean()) / df['isometric'].std(ddof=0)
-df['isokinetic_std'] = (df['isokinetic'] - df['isokinetic'].mean()) / df['isokinetic'].std(ddof=0)
-df['kem_std'] = (df['kem'] - df['kem'].mean()) / df['kem'].std(ddof=0)
-df['isometric_std_BwH'] = (df['isometric_BwH'] - df['isometric_BwH'].mean()) / df['isometric_BwH'].std(ddof=0)
-df['isokinetic_std_BwH'] = (df['isokinetic_BwH'] - df['isokinetic_BwH'].mean()) / df['isokinetic_BwH'].std(ddof=0)
-df['kem_std_BwH'] = (df['kem_BwH'] - df['kem_BwH'].mean()) / df['kem_BwH'].std(ddof=0)
-
-# Labels and targets
-outcomes = ['volume', 'radial_diffusivity', 'composite_x', 'isometric_std', 'isokinetic_std', 'kem_std',
-            'isometric_std_BwH', 'isokinetic_std_BwH', 'kem_std_BwH']
-outcome_labels = ['Volume', 'Radial Diffusivity', 'Composite',
-                  'Isometric Torque (Standardized)', '120 deg/s Isokinetic Torque (Standardized)', 'Peak KEM Stand (Standardized)',
-                  'Isometric Torque (%BwH)', '120 deg/s Isokinetic Torque (%BwH)', 'Peak KEM Stand (%BwH)']
-
-# Table to store results
-results = []
-
-# Function to compute partial eta squared
-def compute_partial_eta_sq(full_model, reduced_model):
-    ssr_full = full_model.ssr
-    ssr_reduced = reduced_model.ssr
-    ss_effect = ssr_reduced - ssr_full
-    return ss_effect / (ss_effect + ssr_full)
-
-# Run models and collect values
-for outcome, label in zip(outcomes, outcome_labels):
-    y = df[outcome]
-    X = sm.add_constant(df[['age_std', 'sex']])
-    model = sm.OLS(y, X).fit()
-
-    model_age = sm.OLS(y, sm.add_constant(df[['sex']])).fit()
-    model_sex = sm.OLS(y, sm.add_constant(df[['age_std']])).fit()
-
-    eta_sq_age = compute_partial_eta_sq(model, model_age)
-    eta_sq_sex = compute_partial_eta_sq(model, model_sex)
-
-    results.append({
-        'Outcome': label,
-        'Age β (95% CI)': f"{model.params['age_std']:.2f} ({model.conf_int().loc['age_std', 0]:.2f}, {model.conf_int().loc['age_std', 1]:.2f})",
-        'Age p': f"{model.pvalues['age_std']:.3f}",
-        'Age η²p': f"{eta_sq_age:.3f}",
-        'Sex β (95% CI)': f"{model.params['sex']:.2f} ({model.conf_int().loc['sex', 0]:.2f}, {model.conf_int().loc['sex', 1]:.2f})",
-        'Sex p': f"{model.pvalues['sex']:.3f}",
-        'Sex η²p': f"{eta_sq_sex:.3f}",
-    })
-
-results_df = pd.DataFrame(results)
-print(results_df.to_string(index=False))
-# results_df.to_excel(os.path.join(repo_dir, 'finalFigures/regression_results_timepoint{}_BwH_Norm.xlsx'.format(timepoint_to_plot)),
-#                      index=False)
 
