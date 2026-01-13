@@ -291,6 +291,46 @@ plt.savefig(os.path.join(repo_dir, f'finalFigures/KEM_vs_MRI_timepoint{timepoint
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
+# do it again but this time with contractile volume vs peak_kem_stand, contractile volume vs isokinetic 120, and contractile volume vs isometric torque
+fig, ax = plt.subplots(1, 3, figsize=(7.2, 3))
+# Plot 1: contractile_volume vs peak_kem_stand
+sns.regplot(x=peak_kem_stand, y=contractile_volume_standardized, ax=ax[0], color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[0].set_xlabel('Knee Extension Moment (Nm)')
+ax[0].set_ylabel('Contractile Volume (Standardized)')
+correlation1, p_value1 = pearsonr(peak_kem_stand, contractile_volume_standardized)
+p_str = f"p={p_value1:.3f}".replace("p=0", "p=") if p_value1 >= 0.001 else "p<.001"
+ax[0].text(0.5, 1, f'r={correlation1:.2f}, {p_str}', transform=ax[0].transAxes, ha='center')
+# Plot 2: contractile_volume vs isokinetic 120
+sns.regplot(x=torque4, y=contractile_volume_standardized, ax=ax[1], color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[1].set_xlabel('Isokinetic Torque at 120°/s (Nm)')
+ax[1].set_ylabel('Contractile Volume (Standardized)')
+correlation2, p_value2 = pearsonr(torque4, contractile_volume_standardized)
+p_str = f"p={p_value2:.3f}".replace("p=0", "p=") if p_value2 >= 0.001 else "p<.001"
+ax[1].text(0.5, 1, f'r={correlation2:.2f}, {p_str}', transform=ax[1].transAxes, ha='center')
+# Plot 3: contractile_volume vs isometric torque
+sns.regplot(x=torque0, y=contractile_volume_standardized, ax=ax[2], color='#28aeed',
+            scatter_kws={'s': 20, 'alpha': 1},
+            line_kws={'color': 'black', 'linewidth': 2, 'alpha': 1}, ci=95)
+ax[2].set_xlabel('Isometric Torque (Nm)')
+ax[2].set_ylabel('Contractile Volume (Standardized)')
+correlation3, p_value3 = pearsonr(torque0, contractile_volume_standardized)
+p_str = f"p={p_value3:.3f}".replace("p=0", "p=") if p_value3 >= 0.001 else "p<.001"
+ax[2].text(0.5, 1, f'r={correlation3:.2f}, {p_str}', transform=ax[2].transAxes, ha='center')
+# Despine all subplots (top and right only)
+for axis in ax:
+    sns.despine(ax=axis, top=True, right=True)
+fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
+# Save the figure
+plt.savefig(os.path.join(repo_dir,
+            f'finalFigures/Isometric_Isokinetic_vs_ContractileVolume_timepoint{timepoint_to_plot}_regression.svg'),
+            format='svg', dpi=300, bbox_inches='tight')
+plt.show()
+
+
 n = len(df)
 peak_kem_stand_pred_volume = np.zeros(n)
 peak_kem_stand_pred_rd  = np.zeros(n)
@@ -456,6 +496,10 @@ print('Peak Torso Angular Velocity and Radial Diffusivity: r= {:.2f}, p= {:.2e}'
     correlation_ang_vel, p_value_ang_vel))
 print()
 
+# correlations of kem predicted volume, rd, and x vs actual values
+correlation_KEM_pred_volume, p_value_KEM_pred_volume = pearsonr(peak_kem_stand_pred_volume, volume_total_standardized)
+correlation_KEM_pred_rd, p_value_KEM_pred_rd = pearsonr(peak_kem_stand_pred_rd, radial_diffusivity_standardized)
+correlation_KEM_pred_x, p_value_KEM_pred_x = pearsonr(peak_kem_stand_pred_x, x)
 
 # correlations of kem vs volume, rd, and x
 correlation_KEM_volume, p_value_KEM_volume = pearsonr(peak_kem_stand, volume_total_standardized)
@@ -473,6 +517,9 @@ correlation_torque4_rd, p_value_torque4_rd = pearsonr(torque4, radial_diffusivit
 correlation_torque4_x, p_value_torque4_x = pearsonr(torque4, x)
 
 # print the correlations
+print('KEM Predicted Volume and Actual Volume Total: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_pred_volume, p_value_KEM_pred_volume))
+print('KEM Predicted Radial Diffusivity and Actual Radial Diffusivity: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_pred_rd, p_value_KEM_pred_rd))
+print('KEM Predicted Composite and Actual Composite: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_pred_x, p_value_KEM_pred_x))
 print('Peak KEM Stand and Volume Total: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_volume, p_value_KEM_volume))
 print('Peak KEM Stand and Radial Diffusivity: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_rd, p_value_KEM_rd))
 print('Peak KEM Stand and Radial Diffusivity + Volume Total: r= {:.2f}, p= {:.2e}'.format(correlation_KEM_x, p_value_KEM_x))
@@ -498,36 +545,11 @@ correlation_ang_vel_x, p_value_ang_vel_x = pearsonr(peak_torso_ang_vel, x)
 from statsmodels.stats.multitest import multipletests
 
 # -------------------------
-# PRIMARY HYPOTHESES (3x): KEM vs MRI metrics (Volume, RD, Composite)
-# -------------------------
-primary_names = [
-    "KEM ~ Volume",
-    "KEM ~ RD",
-    "KEM ~ Composite"
-]
-primary_r = np.array([
-    correlation_KEM_volume,
-    correlation_KEM_rd,
-    correlation_KEM_x
-])
-primary_p = np.array([
-    p_value_KEM_volume,
-    p_value_KEM_rd,
-    p_value_KEM_x
-])
-
-_, primary_p_fdr, _, _ = multipletests(primary_p, alpha=0.05, method='fdr_bh')
-
-print("\nFDR-corrected PRIMARY hypotheses (KEM vs MRI metrics):")
-for name, r_val, p_raw, p_adj in zip(primary_names, primary_r, primary_p, primary_p_fdr):
-    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.2e}, p_FDR = {p_adj:.2e}")
-
-# -------------------------
-# SECONDARY HYPOTHESES (15x):
-# STS, torso angle, torso velocity, isometric, isokinetic vs
+# HYPOTHESES (18x):
+# STS, torso angle, torso velocity, isometric, isokinetic, KEM vs
 # Volume, RD, Composite
 # -------------------------
-secondary_names = [
+hypothesis_names = [
     # STS
     "STS ~ Volume",
     "STS ~ RD",
@@ -548,9 +570,13 @@ secondary_names = [
     "Isometric ~ Volume",
     "Isometric ~ RD",
     "Isometric ~ Composite",
+    # KEM (repeated for completeness)
+    "KEM ~ Volume",
+    "KEM ~ RD",
+    "KEM ~ Composite",
 ]
 
-secondary_r = np.array([
+hypothesis_r = np.array([
     # STS
     correlation_STS_volume,
     correlation_STS_rd,
@@ -571,9 +597,13 @@ secondary_r = np.array([
     correlation_torque0_volume,
     correlation_torque0_rd,
     correlation_torque0_x,
+    # KEM (repeated for completeness)
+    correlation_KEM_volume,
+    correlation_KEM_rd,
+    correlation_KEM_x,
 ])
 
-secondary_p = np.array([
+hypothesis_p = np.array([
     # STS
     p_value_STS_volume,
     p_value_STS_rd,
@@ -594,33 +624,32 @@ secondary_p = np.array([
     p_value_torque0_volume,
     p_value_torque0_rd,
     p_value_torque0_x,
+    # KEM (repeated for completeness)
+    p_value_KEM_volume,
+    p_value_KEM_rd,
+    p_value_KEM_x,
 ])
 
-_, secondary_p_fdr, _, _ = multipletests(secondary_p, alpha=0.05, method='fdr_bh')
+_, hypothesis_p_fdr, _, _ = multipletests(hypothesis_p, alpha=0.05, method='fdr_bh')
 
-print("\nFDR-corrected SECONDARY hypotheses (other metrics vs MRI):")
-for name, r_val, p_raw, p_adj in zip(secondary_names, secondary_r, secondary_p, secondary_p_fdr):
-    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.2e}, p_FDR = {p_adj:.2e}")
-
-
+print("\nFDR-corrected hypotheses (other metrics vs MRI):")
+for name, r_val, p_raw, p_adj in zip(hypothesis_names, hypothesis_r, hypothesis_p, hypothesis_p_fdr):
+    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.4}, p_FDR = {p_adj:.4}")
 
 
-# ===== Unpack adjusted p-values for convenience =====
-
-# Primary (KEM vs Volume, RD, Composite)
-p_KEM_volume_adj, p_KEM_rd_adj, p_KEM_x_adj = primary_p_fdr
-
-# Secondary indices:
+# indices:
 # STS:         0–2
 # TorsoAngle:  3–5
 # TorsoAngVel: 6–8
 # Isokinetic:  9–11
 # Isometric:   12–14
-p_STS_volume_adj, p_STS_rd_adj, p_STS_x_adj = secondary_p_fdr[0:3]
-p_orientation_volume_adj, p_orientation_rd_adj, p_orientation_x_adj = secondary_p_fdr[3:6]
-p_ang_vel_volume_adj, p_ang_vel_rd_adj, p_ang_vel_x_adj = secondary_p_fdr[6:9]
-p_torque4_volume_adj, p_torque4_rd_adj, p_torque4_x_adj = secondary_p_fdr[9:12]   # Isokinetic 120
-p_torque0_volume_adj, p_torque0_rd_adj, p_torque0_x_adj = secondary_p_fdr[12:15]  # Isometric
+# KEM:         15–17
+p_STS_volume_adj, p_STS_rd_adj, p_STS_x_adj = hypothesis_p_fdr[0:3]
+p_orientation_volume_adj, p_orientation_rd_adj, p_orientation_x_adj = hypothesis_p_fdr[3:6]
+p_ang_vel_volume_adj, p_ang_vel_rd_adj, p_ang_vel_x_adj = hypothesis_p_fdr[6:9]
+p_torque4_volume_adj, p_torque4_rd_adj, p_torque4_x_adj = hypothesis_p_fdr[9:12]   # Isokinetic 120
+p_torque0_volume_adj, p_torque0_rd_adj, p_torque0_x_adj = hypothesis_p_fdr[12:15]  # Isometric
+p_KEM_volume_adj, p_KEM_rd_adj, p_KEM_x_adj = hypothesis_p_fdr[15:18]  # KEM repeated
 
 
 
@@ -752,4 +781,47 @@ plt.show()
 
 colors = ['#28aeed' if sex == 'M' else '#FFD100' for sex in sex_vector]
 
+# Printing demographics:
+def mean_sd(x, fmt="{:.2f}"):
+    return f"{fmt.format(np.nanmean(x))} ± {fmt.format(np.nanstd(x, ddof=1))}"
 
+def range_str(x, fmt="{:.1f}"):
+    return f"{fmt.format(np.nanmin(x))}–{fmt.format(np.nanmax(x))}"
+
+N = len(age)
+
+unique, counts = np.unique(sex_vector, return_counts=True)
+sex_counts = dict(zip(unique, counts))
+
+sex_str = ", ".join([f"{k}={v}" for k, v in sex_counts.items()])
+
+table = pd.DataFrame({
+    "Variable": [
+        "Participants",
+        "Age (years)",
+        "Weight (kg)",
+        "Height (cm)",
+        "Five-Times Sit-to-Stand (s)",
+        "Quadriceps Volume (cm³)",
+        "Radial Diffusivity",
+        "Isometric Torque (Nm)",
+        "Isokinetic Torque (Nm)",
+        "Peak Knee Extension Moment (Nm/kg)"
+    ],
+    "Value": [
+        f"{N} ({sex_str})",
+        f"{mean_sd(age)} ({range_str(age)})",
+        mean_sd(weight),
+        mean_sd(height),
+        mean_sd(STS_time),
+        mean_sd(volume_total),
+        mean_sd(radial_diffusivity, fmt="{:.4f}"),
+        mean_sd(torque0),
+        mean_sd(torque4),
+        mean_sd(peak_kem_stand)
+    ]
+})
+print()
+print("Demographics and Key Variables:")
+print(table.to_string(index=False))
+table.to_csv(os.path.join(repo_dir, f'finalFigures/demographics.csv'), index=False)
