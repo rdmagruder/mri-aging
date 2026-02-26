@@ -5,15 +5,11 @@ import os
 from scipy.stats import pearsonr
 import re
 import seaborn as sns
-import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
-from sklearn.cross_decomposition import PLSCanonical
 from sklearn.linear_model import LinearRegression
-from statsmodels.stats.multitest import multipletests
 
 plt.rcParams.update({
     'font.family': 'Arial',
-    'font.size': 8,               # Minimum 8pt for IEEE; 10pt preferred if space allows
+    'font.size': 8,
     'axes.titlesize': 8,
     'axes.labelsize': 8,
     'xtick.labelsize': 8,
@@ -27,15 +23,15 @@ repo_dir = os.path.dirname(os.path.realpath(__file__))
 # Load data
 data = pd.read_excel(os.path.join(repo_dir, 'opencap_merged.xlsx'))
 
-# get Radial_Diffusivity and Volume for each muscle, for each Subject and Timepoint
+# get Radial_Diffusivity and Volume for each muscle, for each Subject and Laterality
 muscles = ['RF', 'VI', 'VM', 'VL']
-# define timepoints from data
-timepoints = np.unique(data['Timepoint'])
+# define lateralities from data
+lateralities = np.unique(data['Laterality'])
 velocities = [0, -60, -45, 90, 120]
 # define subjects from data - it is a string
 subjects = pd.unique(data['Subject'])
-# remove nan from timepoints and subjects
-timepoints = timepoints[~np.isnan(timepoints)]
+# remove nan from lateralities and subjects
+lateralities = lateralities[~np.isnan(lateralities)]
 subjects = subjects[~pd.isnull(subjects)]
 # get all columns that start with peak_kem_stand
 peak_kem_stand_columns = [col for col in data.columns if col.startswith('peak_kem_stand')]
@@ -48,72 +44,72 @@ peak_torso_ang_vel_columns = [col for col in data.columns if re.match(r'^torso_a
 torso_orientation_liftoff_columns = [col for col in data.columns if re.match(r'^torso_ori_liftoff[1-3]$', col)]
 
 # create a dictionary to store the data for each muscle
-data_dict = {'Peak KEM Stand': np.zeros((len(subjects), len(timepoints))),
-             'Peak KEM Sit': np.zeros((len(subjects), len(timepoints))),
-             'Peak HFM Stand': np.zeros((len(subjects), len(timepoints))),
-             'Peak HFM Sit': np.zeros((len(subjects), len(timepoints))),
-             'Peak Force Sit': np.zeros((len(subjects), len(timepoints))),
-             'Peak Force Stand': np.zeros((len(subjects), len(timepoints))),
-             'Volume total': np.zeros((len(subjects), len(timepoints))),
-             'contractile_volume': np.zeros((len(subjects), len(timepoints))),
-             'Age': np.zeros((len(subjects), len(timepoints))),
-             'Sex': np.full((len(subjects), len(timepoints)), None, dtype=object),
-             'Weight': np.zeros((len(subjects), len(timepoints))),
-             'Height': np.zeros((len(subjects), len(timepoints))),
-             'STS_time': np.zeros((len(subjects), len(timepoints))),
-             'Peak Torso Ang Velocity': np.zeros((len(subjects), len(timepoints))),
-             'Torso Orientation at Liftoff': np.zeros((len(subjects), len(timepoints)))}
+data_dict = {'Peak KEM Stand': np.zeros((len(subjects), len(lateralities))),
+             'Peak KEM Sit': np.zeros((len(subjects), len(lateralities))),
+             'Peak HFM Stand': np.zeros((len(subjects), len(lateralities))),
+             'Peak HFM Sit': np.zeros((len(subjects), len(lateralities))),
+             'Peak Force Sit': np.zeros((len(subjects), len(lateralities))),
+             'Peak Force Stand': np.zeros((len(subjects), len(lateralities))),
+             'Volume total': np.zeros((len(subjects), len(lateralities))),
+             'contractile_volume': np.zeros((len(subjects), len(lateralities))),
+             'Age': np.zeros((len(subjects), len(lateralities))),
+             'Sex': np.full((len(subjects), len(lateralities)), None, dtype=object),
+             'Weight': np.zeros((len(subjects), len(lateralities))),
+             'Height': np.zeros((len(subjects), len(lateralities))),
+             'STS_time': np.zeros((len(subjects), len(lateralities))),
+             'Peak Torso Ang Velocity': np.zeros((len(subjects), len(lateralities))),
+             'Torso Orientation at Liftoff': np.zeros((len(subjects), len(lateralities)))}
 
 for muscle in muscles:
-    data_dict[muscle] = {'Radial Diffusivity': np.zeros((len(subjects), len(timepoints))),
-                         'Volume': np.zeros((len(subjects), len(timepoints))),
-                         'Fat Fraction': np.zeros((len(subjects), len(timepoints))),
-                         'CSA': np.zeros((len(subjects), len(timepoints))),
-                         'Torque': np.zeros((len(subjects), len(timepoints), len(velocities)))}
+    data_dict[muscle] = {'Radial Diffusivity': np.zeros((len(subjects), len(lateralities))),
+                         'Volume': np.zeros((len(subjects), len(lateralities))),
+                         'Fat Fraction': np.zeros((len(subjects), len(lateralities))),
+                         'CSA': np.zeros((len(subjects), len(lateralities))),
+                         'Torque': np.zeros((len(subjects), len(lateralities), len(velocities)))}
 
     for i, subject in enumerate(subjects):
-        for j, timepoint in enumerate(timepoints):
+        for j, laterality in enumerate(lateralities):
             data_dict[muscle]['Radial Diffusivity'][i, j] = \
-            data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint) & (data['Muscle'] == muscle)][
+            data[(data['Subject'] == subject) & (data['Laterality'] == laterality) & (data['Muscle'] == muscle)][
                 'Radial_Diffusivity'].mean()
             data_dict[muscle]['Volume'][i, j] = \
-            data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint) & (data['Muscle'] == muscle)][
+            data[(data['Subject'] == subject) & (data['Laterality'] == laterality) & (data['Muscle'] == muscle)][
                 'Volume'].mean()
             data_dict[muscle]['Fat Fraction'][i, j] = \
-            data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint) & (data['Muscle'] == muscle)][
+            data[(data['Subject'] == subject) & (data['Laterality'] == laterality) & (data['Muscle'] == muscle)][
                 'Fat_Fraction'].mean()
             data_dict[muscle]['CSA'][i, j] = \
-            data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint) & (data['Muscle'] == muscle)][
+            data[(data['Subject'] == subject) & (data['Laterality'] == laterality) & (data['Muscle'] == muscle)][
                 'CSA'].mean()
             for k, velocity in enumerate(velocities):
                 data_dict[muscle]['Torque'][i, j, k] = data[
-                    (data['Subject'] == subject) & (data['Timepoint'] == timepoint) & (data['Muscle'] == muscle) & (
+                    (data['Subject'] == subject) & (data['Laterality'] == laterality) & (data['Muscle'] == muscle) & (
                                 data['Velocity'] == velocity)]['Torque'].mean()
 
-            # get the peak_kem_stand columns and average for this subject and timepoint - average over whole matrix
+            # get the peak_kem_stand columns and average for this subject and laterality - average over whole matrix
             data_dict['Peak KEM Stand'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_kem_stand_columns])
             data_dict['Peak KEM Sit'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_kem_sit_columns])
             data_dict['Peak HFM Stand'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_hfm_stand_columns])
             data_dict['Peak HFM Sit'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_hfm_sit_columns])
             data_dict['Peak Force Sit'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_force_sit_columns])
             data_dict['Peak Force Stand'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_force_stand_columns])
             data_dict['Peak Torso Ang Velocity'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  peak_torso_ang_vel_columns])
             data_dict['Torso Orientation at Liftoff'][i, j] = np.mean(
-                [data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)][col].values[0] for col in
+                [data[(data['Subject'] == subject) & (data['Laterality'] == laterality)][col].values[0] for col in
                  torso_orientation_liftoff_columns])
 
             # Sum the volumes for each muscle
@@ -123,28 +119,28 @@ for muscle in muscles:
                     [data_dict[muscle]['Volume'][i, j] * (1 - data_dict[muscle]['Fat Fraction'][i, j] / 100) for muscle
                      in muscles])
 
-                # get the age for this subject and timepoint
+                # get the age for this subject and laterality
                 data_dict['Age'][i, j] = \
-                data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)]['Age'].values[0]
-                # get the weight for this subject and timepoint
+                data[(data['Subject'] == subject) & (data['Laterality'] == laterality)]['Age'].values[0]
+                # get the weight for this subject and laterality
                 data_dict['Weight'][i, j] = \
-                data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)]['Weight'].values[0]
-                # get the height for this subject and timepoint
+                data[(data['Subject'] == subject) & (data['Laterality'] == laterality)]['Weight'].values[0]
+                # get the height for this subject and laterality
                 data_dict['Height'][i, j] = \
-                data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)]['Height'].values[0]
-                # get the STS_time for this subject and timepoint
+                data[(data['Subject'] == subject) & (data['Laterality'] == laterality)]['Height'].values[0]
+                # get the STS_time for this subject and laterality
                 data_dict['STS_time'][i, j] = \
-                data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)]['STS_stopwatch'].values[0]
-                sex_value = data[(data['Subject'] == subject) & (data['Timepoint'] == timepoint)]['Sex']
+                data[(data['Subject'] == subject) & (data['Laterality'] == laterality)]['STS_stopwatch'].values[0]
+                sex_value = data[(data['Subject'] == subject) & (data['Laterality'] == laterality)]['Sex']
                 data_dict['Sex'][i, j] = sex_value.values[0]
 
 
-# for each subject and timepoint, create a weighted average across muscles weighted by volume
-# create a dictionary to store the weighted average for each subject and timepoint
-weighted_diffusivity = np.zeros((len(subjects), len(timepoints)))
-weighted_fat_fraction = np.zeros((len(subjects), len(timepoints)))
+# for each subject and laterality, create a weighted average across muscles weighted by volume
+# create a dictionary to store the weighted average for each subject and laterality
+weighted_diffusivity = np.zeros((len(subjects), len(lateralities)))
+weighted_fat_fraction = np.zeros((len(subjects), len(lateralities)))
 for i, subject in enumerate(subjects):
-    for j, timepoint in enumerate(timepoints):
+    for j, laterality in enumerate(lateralities):
         total_volume = np.sum([data_dict[muscle]['Volume'][i, j] for muscle in muscles])
         weighted_diffusivity[i, j] = np.sum(
             [data_dict[muscle]['Radial Diffusivity'][i, j] * data_dict[muscle]['Volume'][i, j] / total_volume for muscle
@@ -153,33 +149,33 @@ for i, subject in enumerate(subjects):
             [data_dict[muscle]['Fat Fraction'][i, j] * data_dict[muscle]['Volume'][i, j] / total_volume for muscle in
              muscles])
 
-# Second timepoint
-timepoint_to_plot = 1
+# Second laterality
+laterality_to_plot = 1
 velocity_to_plot = 0  # 0, 1, 2, 3, 4 corresponds to 0, -60, -45, 90, 120
 remove_nans = True
 color_by_sex = True
 
-radial_diffusivity = weighted_diffusivity[:, timepoint_to_plot]
-fat_fraction = weighted_fat_fraction[:, timepoint_to_plot]
-volume_total = data_dict['Volume total'][:, timepoint_to_plot]
-contractile_volume = data_dict['contractile_volume'][:, timepoint_to_plot]
-peak_kem_stand = data_dict['Peak KEM Stand'][:, timepoint_to_plot]
-peak_kem_sit = data_dict['Peak KEM Sit'][:, timepoint_to_plot]
-peak_hfm_stand = data_dict['Peak HFM Stand'][:, timepoint_to_plot]
-peak_hfm_sit = data_dict['Peak HFM Sit'][:, timepoint_to_plot]
-peak_force_stand = data_dict['Peak Force Stand'][:, timepoint_to_plot]
-peak_force_sit = data_dict['Peak Force Sit'][:, timepoint_to_plot]
-peak_torso_ang_vel = data_dict['Peak Torso Ang Velocity'][:, timepoint_to_plot]
-torso_orientation_liftoff = data_dict['Torso Orientation at Liftoff'][:, timepoint_to_plot]
-age = data_dict['Age'][:, timepoint_to_plot]
-weight = data_dict['Weight'][:, timepoint_to_plot]
-height = data_dict['Height'][:, timepoint_to_plot]
-STS_time = data_dict['STS_time'][:, timepoint_to_plot]
-torque0 = data_dict[muscles[0]]['Torque'][:, timepoint_to_plot, 0]
-torque1 = data_dict[muscles[0]]['Torque'][:, timepoint_to_plot, 1]
-torque2 = data_dict[muscles[0]]['Torque'][:, timepoint_to_plot, 2]
-torque3 = data_dict[muscles[0]]['Torque'][:, timepoint_to_plot, 3]
-torque4 = data_dict[muscles[0]]['Torque'][:, timepoint_to_plot, 4]
+radial_diffusivity = weighted_diffusivity[:, laterality_to_plot]
+fat_fraction = weighted_fat_fraction[:, laterality_to_plot]
+volume_total = data_dict['Volume total'][:, laterality_to_plot]
+contractile_volume = data_dict['contractile_volume'][:, laterality_to_plot]
+peak_kem_stand = data_dict['Peak KEM Stand'][:, laterality_to_plot]
+peak_kem_sit = data_dict['Peak KEM Sit'][:, laterality_to_plot]
+peak_hfm_stand = data_dict['Peak HFM Stand'][:, laterality_to_plot]
+peak_hfm_sit = data_dict['Peak HFM Sit'][:, laterality_to_plot]
+peak_force_stand = data_dict['Peak Force Stand'][:, laterality_to_plot]
+peak_force_sit = data_dict['Peak Force Sit'][:, laterality_to_plot]
+peak_torso_ang_vel = data_dict['Peak Torso Ang Velocity'][:, laterality_to_plot]
+torso_orientation_liftoff = data_dict['Torso Orientation at Liftoff'][:, laterality_to_plot]
+age = data_dict['Age'][:, laterality_to_plot]
+weight = data_dict['Weight'][:, laterality_to_plot]
+height = data_dict['Height'][:, laterality_to_plot]
+STS_time = data_dict['STS_time'][:, laterality_to_plot]
+torque0 = data_dict[muscles[0]]['Torque'][:, laterality_to_plot, 0]
+torque1 = data_dict[muscles[0]]['Torque'][:, laterality_to_plot, 1]
+torque2 = data_dict[muscles[0]]['Torque'][:, laterality_to_plot, 2]
+torque3 = data_dict[muscles[0]]['Torque'][:, laterality_to_plot, 3]
+torque4 = data_dict[muscles[0]]['Torque'][:, laterality_to_plot, 4]
 
 # see if theres a nan in the row for either radial_diffusivity or peak_kem_stand. Remove that row from both vectors if theres a nan in that row of either vector
 no_nans = ~(np.isnan(peak_kem_stand) | np.isnan(radial_diffusivity))
@@ -205,7 +201,7 @@ torque2 = torque2[no_nans]
 torque3 = torque3[no_nans]
 torque4 = torque4[no_nans]
 torques = np.column_stack((torque0, torque1, torque2, torque3, torque4))
-sex_vector = np.array(data_dict['Sex'][:, timepoint_to_plot])[no_nans]
+sex_vector = np.array(data_dict['Sex'][:, laterality_to_plot])[no_nans]
 
 
 if color_by_sex:
@@ -251,7 +247,6 @@ df = pd.DataFrame({
 
 
 
-# Redo it but with a black line for the regression line with automatic confidence intervals using seaborn
 # remove grid
 fig, ax = plt.subplots(1, 3, figsize=(7.2, 3))
 
@@ -287,7 +282,7 @@ for axis in ax:
     sns.despine(ax=axis, top=True, right=True)
 fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
 # Save the figure
-plt.savefig(os.path.join(repo_dir, f'finalFigures/KEM_vs_MRI_timepoint{timepoint_to_plot}_regression.svg'),
+plt.savefig(os.path.join(repo_dir, f'finalFigures/KEM_vs_MRI_laterality{laterality_to_plot}_regression.svg'),
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -326,7 +321,7 @@ for axis in ax:
 fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
 # Save the figure
 plt.savefig(os.path.join(repo_dir,
-            f'finalFigures/Isometric_Isokinetic_vs_ContractileVolume_timepoint{timepoint_to_plot}_regression.svg'),
+            f'finalFigures/Isometric_Isokinetic_vs_ContractileVolume_laterality{laterality_to_plot}_regression.svg'),
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -386,7 +381,7 @@ for axis in ax:
 fig.subplots_adjust(wspace=0.3)  # Adjust space between subplots
 # Save the figure
 plt.savefig(os.path.join(repo_dir,
-            f'finalFigures/KEM_vs_MRI_timepoint{timepoint_to_plot}_regression_LOSO.svg'),
+            f'finalFigures/KEM_vs_MRI_laterality{laterality_to_plot}_regression_LOSO.svg'),
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -449,7 +444,7 @@ for i, spd in enumerate(speed_labels):
 plt.tight_layout()
 fig.subplots_adjust(hspace=0.6, wspace=0.35)
 
-out_path = os.path.join(repo_dir, f'finalFigures/TorqueSpeeds_vs_MRI_timepoint{timepoint_to_plot}_regression_grid.svg')
+out_path = os.path.join(repo_dir, f'finalFigures/TorqueSpeeds_vs_MRI_laterality{laterality_to_plot}_regression_grid.svg')
 plt.savefig(out_path, format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -715,7 +710,7 @@ ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), frameon=False)
 plt.tight_layout()
 sns.despine(ax=ax, top=True, right=True, bottom=True)
 # Save the figure
-plt.savefig(os.path.join(repo_dir, 'finalFigures/correlation_barplot_sts_timepoint{}.svg'.format(timepoint_to_plot)),
+plt.savefig(os.path.join(repo_dir, 'finalFigures/correlation_barplot_sts_laterality{}.svg'.format(laterality_to_plot)),
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -773,7 +768,7 @@ sns.despine(ax=ax, top=True, right=True, bottom=True)
 plt.tight_layout()
 
 # Save figure
-plt.savefig(os.path.join(repo_dir, f'finalFigures/correlation_barplot_torque_grouped_by_mri_timepoint{timepoint_to_plot}.svg'),
+plt.savefig(os.path.join(repo_dir, f'finalFigures/correlation_barplot_torque_grouped_by_mri_laterality{laterality_to_plot}.svg'),
             format='svg', dpi=300, bbox_inches='tight')
 plt.show()
 
