@@ -1,7 +1,7 @@
 # Smartphone video–based estimates of the knee extension moment during chair rise relate to MRI measures of muscle function
 
 <p align="center">
-  <img src="static/graphical_abstract.svg" width="900">
+  <img src="static/MRI_OpenCap_Graphical_Abstract.svg" width="900">
 </p>
 
 ## Overview
