@@ -1,4 +1,4 @@
-# Smartphone video–based estimates of the knee extension moment during chair rise relate to MRI measures of muscle function
+# MRI-OpenCap KEM Analysis
 
 <p align="center">
   <img src="static/MRI_OpenCap_Graphical_Abstract.svg" width="900">
