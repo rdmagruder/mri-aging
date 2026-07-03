@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, shapiro, spearmanr, norm
 import re
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
+from statsmodels.stats.multitest import multipletests
 
 plt.rcParams.update({
     'font.family': 'Arial',
@@ -16,6 +17,17 @@ plt.rcParams.update({
     'ytick.labelsize': 8,
     'legend.fontsize': 8
 })
+
+# Power analysis: required N to detect a given correlation (Fisher z approximation)
+def required_n_for_correlation(r, power=0.80, alpha=0.05, alternative='two-sided'):
+    z_r = np.arctanh(r)
+    z_alpha = norm.ppf(1 - alpha / 2) if alternative == 'two-sided' else norm.ppf(1 - alpha)
+    z_beta = norm.ppf(power)
+    return round(((z_alpha + z_beta) / z_r) ** 2 + 3)
+
+_n_required = required_n_for_correlation(0.60, power=0.80, alpha=0.05, alternative='two-sided')
+print('Power analysis: to detect r=0.60 at alpha=0.05 (two-tailed) with 80% power, required N = {}'.format(_n_required))
+print()
 
 # repo path is the directory of this file
 repo_dir = os.path.dirname(os.path.realpath(__file__))
@@ -42,6 +54,8 @@ peak_force_sit_columns = [col for col in data.columns if col.startswith('peak_fo
 peak_force_stand_columns = [col for col in data.columns if col.startswith('peak_force_stand')]
 peak_torso_ang_vel_columns = [col for col in data.columns if re.match(r'^torso_ang_vel[1-3]$', col)]
 torso_orientation_liftoff_columns = [col for col in data.columns if re.match(r'^torso_ori_liftoff[1-3]$', col)]
+rise_time_columns = [col for col in data.columns if re.match(r'^rise_time[1-3]$', col)]
+
 
 # create a dictionary to store the data for each muscle
 data_dict = {'Peak KEM Stand': np.zeros((len(subjects), len(lateralities))),
@@ -209,6 +223,80 @@ if color_by_sex:
 else:
     colors = '#28aeed'
 
+
+# ICC(3,k) on raw peak KEM trials (before averaging/analysis), analysis participants only, chosen laterality
+def icc_3k(m):
+    n, k = m.shape
+    grand = m.mean()
+    SSR = k * ((m.mean(axis=1) - grand) ** 2).sum()   # between subjects
+    SSC = n * ((m.mean(axis=0) - grand) ** 2).sum()   # between trials
+    SSE = ((m - grand) ** 2).sum() - SSR - SSC
+    MSR = SSR / (n - 1)
+    MSE = SSE / ((n - 1) * (k - 1))
+    return (MSR - MSE) / MSR
+
+
+laterality_value = lateralities[laterality_to_plot]
+kem_trials = np.array([
+    [data[(data['Subject'] == s) & (data['Laterality'] == laterality_value)][col].values[0]
+     for col in peak_kem_stand_columns]
+    for s in subjects
+])
+kem_trials = kem_trials[no_nans]  # analysis participants only
+icc_value = icc_3k(kem_trials)
+print('ICC(3,k) on peak KEM trials (n={}, k={}): {:.3f}'.format(
+    kem_trials.shape[0], kem_trials.shape[1], icc_value))
+print()
+
+risetime_trials = np.array([
+    [data[(data['Subject'] == s) & (data['Laterality'] == laterality_value)][col].values[0]
+     for col in rise_time_columns]
+    for s in subjects
+])
+risetime_trials = risetime_trials[no_nans]  # analysis participants only
+icc_value = icc_3k(risetime_trials)
+print('ICC(3,k) on rise time trials (n={}, k={}): {:.3f}'.format(
+    risetime_trials.shape[0], risetime_trials.shape[1], icc_value))
+print()
+
+torso_orientation_liftoff_trials = np.array([
+    [data[(data['Subject'] == s) & (data['Laterality'] == laterality_value)][col].values[0]
+     for col in torso_orientation_liftoff_columns]
+    for s in subjects
+])
+torso_orientation_liftoff_trials = torso_orientation_liftoff_trials[no_nans]  # analysis participants only
+icc_value = icc_3k(torso_orientation_liftoff_trials)
+print('ICC(3,k) on torso orientation at liftoff trials (n={}, k={}): {:.3f}'.format(
+    torso_orientation_liftoff_trials.shape[0], torso_orientation_liftoff_trials.shape[1], icc_value))
+print()
+
+peak_torso_ang_vel_trials = np.array([
+    [data[(data['Subject'] == s) & (data['Laterality'] == laterality_value)][col].values[0]
+     for col in peak_torso_ang_vel_columns]
+    for s in subjects
+])
+peak_torso_ang_vel_trials = peak_torso_ang_vel_trials[no_nans]  # analysis participants only
+icc_value = icc_3k(peak_torso_ang_vel_trials)
+print('ICC(3,k) on peak torso angular velocity trials (n={}, k={}): {:.3f}'.format(
+    peak_torso_ang_vel_trials.shape[0], peak_torso_ang_vel_trials.shape[1], icc_value))
+print()
+
+# Shapiro-Wilk normality test for each independent variable (averages used in correlations)
+shapiro_variables = {
+    'Total Volume': volume_total,
+    'Radial Diffusivity': radial_diffusivity,
+    'KEM': peak_kem_stand,
+    'Isometric Torque': torque0,
+    'Isokinetic Torque': torque4,
+    'STS Time': STS_time,
+    'Torso Orientation at Liftoff': torso_orientation_liftoff,
+    'Peak Torso Angular Velocity': peak_torso_ang_vel,
+}
+print('Shapiro-Wilk normality tests (independent variables used in correlations):')
+for name, values in shapiro_variables.items():
+    stat, p_value = shapiro(values)
+    print('  {}: W= {:.3f}, p= {:.3f}'.format(name, stat, p_value))
+print()
 
 # multiple regression model to predict peak_kem_stand from some number of inputs
 
@@ -453,8 +541,8 @@ plt.show()
 # Metrics vs x
 correlation_KEM, p_value_KEM = pearsonr(peak_kem_stand, x)
 correlation_STS, p_value_STS = pearsonr(STS_time, x)
-correlation_orientation, p_value_orientation = pearsonr(torso_orientation_liftoff, x)
-correlation_ang_vel, p_value_ang_vel = pearsonr(peak_torso_ang_vel, x)
+correlation_orientation, p_value_orientation = spearmanr(torso_orientation_liftoff, x)
+correlation_ang_vel, p_value_ang_vel = spearmanr(peak_torso_ang_vel, x)
 print('Peak KEM Stand and Radial Diffusivity + Volume Total: r= {:.2f}, p= {:.2e}'.format(
     correlation_KEM, p_value_KEM))
 print('STS Time and Radial Diffusivity + Volume Total: r= {:.2f}, p= {:.2e}'.format(
@@ -468,8 +556,8 @@ print()
 # Metrics vs standardized volume_total
 correlation_KEM, p_value_KEM = pearsonr(peak_kem_stand, volume_total_standardized)
 correlation_STS, p_value_STS = pearsonr(STS_time, volume_total_standardized)
-correlation_orientation, p_value_orientation = pearsonr(torso_orientation_liftoff, volume_total_standardized)
-correlation_ang_vel, p_value_ang_vel = pearsonr(peak_torso_ang_vel, volume_total_standardized)
+correlation_orientation, p_value_orientation = spearmanr(torso_orientation_liftoff, volume_total_standardized)
+correlation_ang_vel, p_value_ang_vel = spearmanr(peak_torso_ang_vel, volume_total_standardized)
 print('Peak KEM Stand and Volume Total: r= {:.2f}, p= {:.2e}'.format(correlation_KEM, p_value_KEM))
 print('STS Time and Volume Total: r= {:.2f}, p= {:.2e}'.format(correlation_STS, p_value_STS))
 print('Torso Orientation at Liftoff and Volume Total: r= {:.2f}, p= {:.2e}'.format(
@@ -481,8 +569,8 @@ print()
 # Metrics vs standardized radial_diffusivity
 correlation_KEM, p_value_KEM = pearsonr(peak_kem_stand, radial_diffusivity_standardized)
 correlation_STS, p_value_STS = pearsonr(STS_time, radial_diffusivity_standardized)
-correlation_orientation, p_value_orientation = pearsonr(torso_orientation_liftoff, radial_diffusivity_standardized)
-correlation_ang_vel, p_value_ang_vel = pearsonr(peak_torso_ang_vel, radial_diffusivity_standardized)
+correlation_orientation, p_value_orientation = spearmanr(torso_orientation_liftoff, radial_diffusivity_standardized)
+correlation_ang_vel, p_value_ang_vel = spearmanr(peak_torso_ang_vel, radial_diffusivity_standardized)
 print('Peak KEM Stand and Radial Diffusivity: r= {:.2f}, p= {:.2e}'.format(correlation_KEM, p_value_KEM))
 print('STS Time and Radial Diffusivity: r= {:.2f}, p= {:.2e}'.format(correlation_STS, p_value_STS))
 print('Torso Orientation at Liftoff and Radial Diffusivity: r= {:.2f}, p= {:.2e}'.format(
@@ -528,12 +616,12 @@ print('Isokinetic Torque and Radial Diffusivity + Volume Total: r= {:.2f}, p= {:
 correlation_STS_volume, p_value_STS_volume = pearsonr(STS_time, volume_total_standardized)
 correlation_STS_rd, p_value_STS_rd = pearsonr(STS_time, radial_diffusivity_standardized)
 correlation_STS_x, p_value_STS_x = pearsonr(STS_time, x)
-correlation_orientation_volume, p_value_orientation_volume = pearsonr(torso_orientation_liftoff, volume_total_standardized)
-correlation_orientation_rd, p_value_orientation_rd = pearsonr(torso_orientation_liftoff, radial_diffusivity_standardized)
-correlation_orientation_x, p_value_orientation_x = pearsonr(torso_orientation_liftoff, x)
-correlation_ang_vel_volume, p_value_ang_vel_volume = pearsonr(peak_torso_ang_vel, volume_total_standardized)
-correlation_ang_vel_rd, p_value_ang_vel_rd = pearsonr(peak_torso_ang_vel, radial_diffusivity_standardized)
-correlation_ang_vel_x, p_value_ang_vel_x = pearsonr(peak_torso_ang_vel, x)
+correlation_orientation_volume, p_value_orientation_volume = spearmanr(torso_orientation_liftoff, volume_total_standardized)
+correlation_orientation_rd, p_value_orientation_rd = spearmanr(torso_orientation_liftoff, radial_diffusivity_standardized)
+correlation_orientation_x, p_value_orientation_x = spearmanr(torso_orientation_liftoff, x)
+correlation_ang_vel_volume, p_value_ang_vel_volume = spearmanr(peak_torso_ang_vel, volume_total_standardized)
+correlation_ang_vel_rd, p_value_ang_vel_rd = spearmanr(peak_torso_ang_vel, radial_diffusivity_standardized)
+correlation_ang_vel_x, p_value_ang_vel_x = spearmanr(peak_torso_ang_vel, x)
 
 
 # FDR CORRECTIONS:
@@ -627,9 +715,41 @@ hypothesis_p = np.array([
 
 _, hypothesis_p_fdr, _, _ = multipletests(hypothesis_p, alpha=0.05, method='fdr_bh')
 
+# correlation method per hypothesis (matches hypothesis_names order): STS pearson,
+# TorsoAngle + TorsoAngVel spearman, Isokinetic/Isometric/KEM pearson
+hypothesis_methods = (['pearson'] * 3) + (['spearman'] * 6) + (['pearson'] * 9)
+
+
+def r_confidence_interval(r, n, alpha=0.05, method='pearson'):
+    z = np.arctanh(r)
+    if method == 'spearman':
+        se = np.sqrt((1 + r ** 2 / 2) / (n - 3))  # Bonett & Wright (2000)
+    else:
+        se = 1 / np.sqrt(n - 3)
+    z_crit = norm.ppf(1 - alpha / 2)
+    return np.tanh(z - z_crit * se), np.tanh(z + z_crit * se)
+
+
+def format_p(p):
+    return '<.001' if p < 0.001 else f'{p:.3f}'
+
+
+n_obs = len(x)
+name_w = max(len(name) for name in hypothesis_names)
+r_ci_w = 24
+p_w = 8
 print("\nFDR-corrected hypotheses (other metrics vs MRI):")
-for name, r_val, p_raw, p_adj in zip(hypothesis_names, hypothesis_r, hypothesis_p, hypothesis_p_fdr):
-    print(f"{name}: r = {r_val:.2f}, p = {p_raw:.4}, p_FDR = {p_adj:.4}")
+header = f"{'Metric':<{name_w}}  {'r [95% CI]':>{r_ci_w}}  {'p':>{p_w}}  {'p_FDR':>{p_w}}"
+print(header)
+print('-' * (name_w + r_ci_w + 2 * p_w + 6))
+group_break_after = {2, 5, 8, 11, 14}  # blank line after each 3-hypothesis block
+for i, (name, r_val, p_raw, p_adj, method) in enumerate(zip(
+        hypothesis_names, hypothesis_r, hypothesis_p, hypothesis_p_fdr, hypothesis_methods)):
+    lo, hi = r_confidence_interval(r_val, n_obs, method=method)
+    r_ci = f"{r_val:.2f} [{lo:.2f}, {hi:.2f}]"
+    print(f"{name:<{name_w}}  {r_ci:>{r_ci_w}}  {format_p(p_raw):>{p_w}}  {format_p(p_adj):>{p_w}}")
+    if i in group_break_after:
+        print()
 
 
 # indices:
@@ -801,7 +921,7 @@ table = pd.DataFrame({
         "Radial Diffusivity",
         "Isometric Torque (Nm)",
         "Isokinetic Torque (Nm)",
-        "Peak Knee Extension Moment (Nm/kg)"
+        "Peak Knee Extension Moment (Nm)"
     ],
     "Value": [
         f"{N} ({sex_str})",
@@ -820,3 +940,28 @@ print()
 print("Demographics and Key Variables:")
 print(table.to_string(index=False))
 table.to_csv(os.path.join(repo_dir, f'finalFigures/demographics.csv'), index=False)
+
+
+# STS time vs total volume normalized (normalization applied before z-scoring)
+BwH = weight * height
+volume_bwh_standardized = (volume_total / BwH - np.mean(volume_total / BwH)) / np.std(volume_total / BwH)
+volume_bw_standardized = (volume_total / weight - np.mean(volume_total / weight)) / np.std(volume_total / weight)
+
+r_bwh, p_bwh = pearsonr(STS_time, volume_bwh_standardized)
+r_bw, p_bw = pearsonr(STS_time, volume_bw_standardized)
+lo_bwh, hi_bwh = r_confidence_interval(r_bwh, len(STS_time), method='pearson')
+lo_bw, hi_bw = r_confidence_interval(r_bw, len(STS_time), method='pearson')
+print()
+print('STS Time vs Volume normalized (normalized before z-scoring):')
+sts_label_w = 28
+sts_r_ci_w = 24
+sts_p_w = 8
+sts_header = f"{'Normalization':<{sts_label_w}}  {'r [95% CI]':>{sts_r_ci_w}}  {'p':>{sts_p_w}}"
+print(sts_header)
+print('-' * (sts_label_w + sts_r_ci_w + sts_p_w + 4))
+for label, r_val, lo, hi, p_val in [
+    ('Volume / (weight*height)', r_bwh, lo_bwh, hi_bwh, p_bwh),
+    ('Volume / weight', r_bw, lo_bw, hi_bw, p_bw),
+]:
+    r_ci = f"{r_val:.2f} [{lo:.2f}, {hi:.2f}]"
+    print(f"{label:<{sts_label_w}}  {r_ci:>{sts_r_ci_w}}  {format_p(p_val):>{sts_p_w}}")
